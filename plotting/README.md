@@ -1,106 +1,108 @@
 # JasSimo-Tools/plotting
 
-Projekt-agnostische, farbenblind-sichere Plot-Bibliothek für alle deine
-Data-Science-Projekte. **Eine** Quelle der Wahrheit für Schriftgrößen, Farben,
-Speicherregeln und Ziel-Geometrie — geteilt über beliebig viele Projekte.
+Project-agnostic, colorblind-safe plotting library for all your data-science
+projects. **One** source of truth for font sizes, colors, saving rules and
+target geometry — shared across any number of projects.
 
-Der Kern-Gedanke: Jede Figur wird für **genau ein Zielmedium** gerendert
-(`slides` | `paper` | `pdf`). Das Ziel legt Geometrie _und_ absolute
-Schriftgrößen fest, sodass Text im Endmedium eine **garantierte, gemessene**
-Größe hat — statt geratener Punktwerte, die auf der Slide dann zu klein sind.
+The core idea: every figure is rendered for **exactly one target medium**
+(`slides` | `paper` | `pdf`). The target fixes geometry _and_ absolute font
+sizes, so text has a **guaranteed, measured** size in the final medium — instead
+of guessed point values that then turn out too small on the slide.
 
 ---
 
-## Einmalige Einrichtung (SSoT über alle Projekte)
+## One-time setup (SSoT across all projects)
 
-Das Paket lebt an **einem** Ort und wird per _editable install_ in jedes Projekt
-eingebunden. „Editable" heißt: Es wird keine Kopie installiert, sondern ein
-Verweis auf diesen Ordner. Änderst du hier eine Zeile, wirkt sie **sofort in
-allen Projekten** — genau die zentrale Wartbarkeit, die du willst.
+The package lives in **one** place and is pulled into each project via an
+_editable install_. "Editable" means: no copy is installed, only a reference to
+this folder. Change one line here and it takes effect **immediately in all
+projects** — exactly the central maintainability you want.
 
 ```bash
-# In JEDEM Projekt, das dieses Werkzeug nutzen soll, einmalig (editable):
+# In EVERY project that should use this tool, once (editable):
 uv add --editable ~/code/JasSimo-Tools/plotting
 ```
 
-Ab jetzt ist `import jassimo.plotting` in diesem Projekt verfügbar und zeigt immer auf
-deine zentrale Datei. Kein Kopieren, kein Nachziehen von Hand.
+From now on `import jassimo.plotting` is available in that project and always
+points at your central file. No copying, no manual updating.
 
-> **Änderungen global ausrollen:** editiere `src/jassimo/plotting/style.py` in diesem
-> Repo. Fertig — jedes Projekt nutzt beim nächsten Lauf die neue Version. (Nur
-> wenn du die `__init__`-Exporte oder Abhängigkeiten änderst, in den Projekten
-> einmal `uv sync` wiederholen.)
+> **Rolling out changes globally:** edit `src/jassimo/plotting/style.py` in this
+> repo. Done — every project uses the new version on its next run. (Only if you
+> change the `__init__` exports or dependencies do you need to repeat `uv sync`
+> once in the projects.)
 
 ---
 
-## Nutzung
+## Usage
 
 ```python
 from jassimo.plotting import set_style, new_figure, savefig, PALETTE, legend_outside
 
-set_style("slides")               # 1x am Anfang eines Runs
-fig, ax = new_figure()            # Figur schon in Ziel-Geometrie
+set_style("slides")               # once at the start of a run
+fig, ax = new_figure()            # figure already in target geometry
 ax.bar(range(5), values, color=PALETTE[0])
 ax.set_title("My result")
 ax.set_xlabel("Category"); ax.set_ylabel("Value")
-legend_outside(ax)                # Legende außerhalb der Achse (überlappt nie)
-savefig(fig, out_dir, "my_result")   # schreibt my_result.png (slides)
+legend_outside(ax)                # legend outside the axes (never overlaps)
+savefig(fig, out_dir, "my_result")   # writes my_result.png (slides)
 ```
 
-Einen Plot für **beide** Medien? Zweimal rendern:
+A plot for **both** media? Render it twice:
 
 ```python
 for target in ("slides", "paper"):
     set_style(target)
     fig, ax = new_figure()
-    ...                            # identischer Plot-Code
+    ...                            # identical plot code
     savefig(fig, out_dir / target, "my_result")
 # -> out_dir/slides/my_result.png  +  out_dir/paper/my_result.svg
 ```
 
 ---
 
-## Die drei Ziele
+## The three targets
 
-| Ziel     | Geometrie   | Titel | Ticks | Ausgabe   | Wofür                                                     |
+| Target   | Geometry    | Title | Ticks | Output    | For what                                                  |
 | -------- | ----------- | ----- | ----- | --------- | --------------------------------------------------------- |
-| `slides` | 10 × 4.5 in | 20 pt | 15 pt | PNG       | Google Slides 16:9, bei **100 %** einfügen (nicht ziehen) |
-| `paper`  | 6 × 4 in    | 15 pt | 11 pt | SVG       | LaTeX/Manuskript-Spalte (Vektor, scharf, durchsuchbar)    |
-| `pdf`    | 8 × 6 in    | 17 pt | 13 pt | PDF + PNG | Standalone-Ganzseiten-Figur                               |
+| `slides` | 10 × 4.5 in | 20 pt | 15 pt | PNG       | Google Slides 16:9, insert at **100 %** (do not drag)     |
+| `paper`  | 6 × 4 in    | 15 pt | 11 pt | SVG       | LaTeX/manuscript column (vector, crisp, searchable)       |
+| `pdf`    | 8 × 6 in    | 17 pt | 13 pt | PDF + PNG | Standalone full-page figure                                |
 
-**Warum `slides` bei 100 % einfügen?** Die Slide ist intern 960 × 540 px (10 ×
-5.625 in @ 96 DPI). Bei 100 % ist 1 matplotlib-pt = 1 Slide-pt, dein 20-pt-Titel
-also eine saubere Stufe unter dem 25-pt-Slide-Titel. Ziehst du das Bild kleiner,
-schrumpft auch die Schrift — dann greift die Garantie nicht mehr.
+**Why insert `slides` at 100 %?** The slide is internally 960 × 540 px (10 ×
+5.625 in @ 96 DPI). At 100 %, 1 matplotlib-pt = 1 slide-pt, so your 20 pt title
+is a clean step below the 25 pt slide title. Drag the image smaller and the font
+shrinks with it — then the guarantee no longer holds.
 
-**Warum SVG fürs Paper und PNG für Slides?** SVG ist Vektor: bei jeder Zoomstufe
-scharf, Text bleibt echter Text. Slides rendern Vektoren gelegentlich fehlerhaft
-— dort ist PNG robuster. PNGs lassen sich problemlos in PDFs einfügen, sind aber
-beim Reinzoomen unscharf; fürs Paper daher SVG.
-
----
-
-## Was garantiert erfüllt ist
-
-- **Schrift auf Slides immer präsentationsgroß** — unabhängig von der Anzahl der
-  Bars/Datenpunkte, weil die figsize fix ist und die Schriften absolut in pt.
-- **Farbenblind-sicher** (Okabe–Ito) als Default-Farbzyklus — auch ohne
-  explizite Farbangabe.
-- **Nichts wird abgeschnitten** (`constrained_layout`), bei zugleich **identischen
-  Pixelmaßen** aller Figuren einer Familie (kein `bbox_inches="tight"`).
-- **Lange Titel** brechen automatisch um statt über den Rand zu laufen.
-- **Legenden** liegen außerhalb der Achse und überlappen nie Daten.
+**Why SVG for the paper and PNG for slides?** SVG is vector: crisp at any zoom
+level, text stays real text. Slides occasionally render vectors incorrectly —
+there PNG is more robust. PNGs can be inserted into PDFs without trouble, but
+get blurry when zooming in; hence SVG for the paper.
 
 ---
 
-## Projektspezifische Farben/Namen
+## What is guaranteed
 
-Diese Bibliothek ist bewusst domänenfrei. Braucht ein Projekt benannte Farben
-(z.B. `ordered`/`disordered`), definierst du eine **dünne Projektschicht**, die
-auf `PALETTE` aufsetzt — nicht in dieser Bibliothek:
+- **Font on slides always presentation-sized** — independent of the number of
+  bars/data points, because the figsize is fixed and the fonts are absolute in
+  pt.
+- **Colorblind-safe** (Okabe–Ito) as the default color cycle — even without
+  explicit color specification.
+- **Nothing gets clipped** (`constrained_layout`), while at the same time all
+  figures of a family have **identical pixel dimensions** (no
+  `bbox_inches="tight"`).
+- **Long titles** wrap automatically instead of running over the edge.
+- **Legends** sit outside the axes and never overlap data.
+
+---
+
+## Project-specific colors/names
+
+This library is deliberately domain-free. If a project needs named colors (e.g.
+`ordered`/`disordered`), you define a **thin project layer** on top of `PALETTE`
+— not in this library:
 
 ```python
-# projekt/plotting.py
+# project/plotting.py
 from jassimo.plotting import PALETTE
 CLASS_COLORS = {"ordered": PALETTE[0], "disordered": PALETTE[3]}
 ```

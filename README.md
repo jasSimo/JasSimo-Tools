@@ -1,93 +1,93 @@
 # JasSimo-Tools
 
-Persönliches Data-Science-Toolkit: **ein** Repo, mehrere **getrennt
-installierbare** Werkzeuge unter dem gemeinsamen Import-Namespace `jassimo`.
+Personal data-science toolkit: **one** repo, several **independently
+installable** tools under the shared import namespace `jassimo`.
 
-Jedes Werkzeug ist ein eigenständiges Paket mit eigenen Abhängigkeiten. Ein
-Projekt installiert nur, was es braucht — ein reines Plot-Projekt zieht nicht die
-schweren Abhängigkeiten eines ML-Werkzeugs mit. Trotzdem leben alle an einem Ort
-unter einer Versionskontrolle: Änderst du ein Werkzeug (editable installiert),
-wirkt die Änderung sofort in allen Projekten, die es nutzen. Das ist deine SSoT.
+Each tool is a standalone package with its own dependencies. A project installs
+only what it needs — a pure plotting project does not pull in the heavy
+dependencies of an ML tool. Even so, they all live in one place under one
+version control: change a tool (installed editable) and the change takes effect
+immediately in every project that uses it. That is your SSoT.
 
-> **Repo-Name vs. Import-Name:** Das Repo heißt `JasSimo-Tools`, der Code
-> importiert sich als `jassimo` (klein, ohne Bindestrich — Python-Regel). Genau
-> wie `scikit-learn` sich als `import sklearn` importiert. Das ist normal.
-
----
-
-## Werkzeuge
-
-| Import             | Zweck                                                    | Abhängigkeiten             |
-| ------------------ | -------------------------------------------------------- | -------------------------- |
-| `jassimo.plotting` | Farbenblind-sicherer Plot-Stil, Ziele Slides/Paper/PDF   | matplotlib, seaborn, numpy |
-| `jassimo.io`       | Geteilte Daten-Lade-Helfer (Platzhalter, wird ausgebaut) | pandas                     |
+> **Repo name vs. import name:** The repo is called `JasSimo-Tools`, the code
+> imports as `jassimo` (lowercase, no hyphen — Python rule). Exactly like
+> `scikit-learn` imports as `import sklearn`. That is normal.
 
 ---
 
-## Einmalige Einrichtung
+## Tools
+
+| Import             | Purpose                                                | Dependencies               |
+| ------------------ | ------------------------------------------------------ | -------------------------- |
+| `jassimo.plotting` | Colorblind-safe plot style, targets slides/paper/PDF    | matplotlib, seaborn, numpy |
+| `jassimo.io`       | Shared data-loading helpers (placeholder, to be built out) | pandas                  |
+
+---
+
+## One-time setup
 
 ```bash
-# 1. Repo an einen festen Ort klonen/legen, z.B. ~/code/JasSimo-Tools
-# 2. uv installieren (falls noch nicht):
+# 1. Clone/place the repo in a fixed location, e.g. ~/code/JasSimo-Tools
+# 2. Install uv (if not already):
 #    curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Am Toolkit selbst arbeiten (alle Werkzeuge auf einmal, editable):
+Working on the toolkit itself (all tools at once, editable):
 
 ```bash
 cd ~/code/JasSimo-Tools
-uv sync            # richtet .venv ein, installiert alle Mitglieder editable
+uv sync            # sets up .venv, installs all members editable
 ```
 
 ---
 
-## In einem echten Projekt nutzen
+## Using it in a real project
 
-Es gibt zwei Wege, ein Werkzeug in ein Projekt einzubinden. Welchen du nimmst,
-hängt davon ab, ob du das Werkzeug gerade **weiterentwickelst** oder nur
-**benutzt**.
+There are two ways to pull a tool into a project. Which one you pick depends on
+whether you are currently **developing** the tool or just **using** it.
 
-### Variante A — lokal geklont, editable (zum Entwickeln)
+### Option A — cloned locally, editable (for development)
 
-Setzt voraus, dass du das Repo geklont hast (siehe oben). Zeigt auf deinen
-lokalen Ordner: Änderst du dort ein Werkzeug, wirkt die Änderung **sofort** in
-allen Projekten. Das ist der richtige Modus, solange du an den Tools schraubst —
-und aktuell dein Standardfall.
+Requires that you have cloned the repo (see above). Points at your local folder:
+change a tool there and the change takes effect **immediately** in every
+project. This is the right mode while you are still tinkering with the tools —
+and currently your default case.
 
 ```bash
-cd ~/code/mein-projekt
-uv add --editable ~/code/JasSimo-Tools/plotting      # nur Plotting
-# uv add --editable ~/code/JasSimo-Tools/io           # bei Bedarf zusätzlich
+cd ~/code/my-project
+uv add --editable ~/code/JasSimo-Tools/plotting      # plotting only
+# uv add --editable ~/code/JasSimo-Tools/io           # additionally, if needed
 ```
 
-### Variante B — direkt aus dem privaten Repo per SSH (zum Benutzen)
+### Option B — straight from the private repo via SSH (for using)
 
-Klont nichts sichtbar in dein Arbeitsverzeichnis — uv holt das Paket selbst aus
-dem Repo. Weil das Repo **privat** ist, läuft die Authentifizierung über deinen
-SSH-Schlüssel (denselben, mit dem `git clone git@github.com:...` schon
-funktioniert). Kein Token im Befehl nötig.
+Clones nothing visible into your working directory — uv fetches the package from
+the repo itself. Because the repo is **private**, authentication runs through
+your SSH key (the same one that already makes `git clone git@github.com:...`
+work). No token needed in the command.
 
 ```bash
-cd ~/code/mein-projekt
+cd ~/code/my-project
 uv add "jassimo-plotting @ git+ssh://git@github.com/jasSimo/JasSimo-Tools.git#subdirectory=plotting"
 ```
 
-Zwei Dinge, die hier wichtig sind:
+Two things that matter here:
 
-- **`#subdirectory=plotting`** ist Pflicht: Weil dies ein Multi-Paket-Repo ist,
-  liegt das Paket im Unterordner `plotting/`, nicht in der Repo-Wurzel. Ohne den
-  Zusatz findet uv das Paket nicht. Für `io` entsprechend `#subdirectory=io`.
-- Diese Installation ist **nicht editable** — sie ist eine Momentaufnahme des
-  Repos zum Installationszeitpunkt. Das ist der Sinn: ein Projekt, das das Tool
-  nur benutzt, bekommt eine stabile Version. Um später eine neuere Version zu
-  ziehen: `uv lock --upgrade-package jassimo-plotting`.
+- **`#subdirectory=plotting`** is mandatory: because this is a multi-package
+  repo, the package lives in the `plotting/` subfolder, not at the repo root.
+  Without that suffix uv will not find the package. For `io` accordingly
+  `#subdirectory=io`.
+- This installation is **not editable** — it is a snapshot of the repo at
+  install time. That is the point: a project that only uses the tool gets a
+  stable version. To pull a newer version later:
+  `uv lock --upgrade-package jassimo-plotting`.
 
-> **Wann welche Variante?** Solange du deine Tools aktiv entwickelst (jetzt):
-> überall **Variante A**, damit jede Änderung sofort greift. **Variante B** wird
-> interessant für Projekte, die eine eingefrorene, reproduzierbare Tool-Version
-> wollen — z.B. auf einem Server oder in CI/CD, wo kein lokaler Klon liegt.
+> **Which option when?** While you are actively developing your tools (now):
+> **Option A** everywhere, so every change takes effect immediately. **Option B**
+> becomes interesting for projects that want a frozen, reproducible tool
+> version — e.g. on a server or in CI/CD, where there is no local clone.
 
-### Im Code
+### In code
 
 ```python
 from jassimo.plotting import set_style, new_figure, savefig, PALETTE
@@ -99,48 +99,48 @@ ax.set_title("My result")
 savefig(fig, out_dir, "my_result")
 ```
 
-Details zum Plotting: [`plotting/README.md`](plotting/README.md).
+Details on plotting: [`plotting/README.md`](plotting/README.md).
 
 ---
 
-## Zentrale Änderungen ausrollen
+## Rolling out central changes
 
-Editier das Werkzeug in diesem Repo (z.B. `plotting/src/jassimo/plotting/style.py`).
-Bei **Variante A** (editable) nutzt jedes Projekt beim nächsten Lauf automatisch
-die neue Version — kein Nachziehen von Hand. Bei **Variante B** (Git-URL) ziehst
-du die Änderung bewusst mit `uv lock --upgrade-package <paket>` nach, sobald du
-sie gepusht hast.
+Edit the tool in this repo (e.g. `plotting/src/jassimo/plotting/style.py`).
+With **Option A** (editable) every project automatically uses the new version on
+its next run — no manual updating. With **Option B** (Git URL) you deliberately
+pull the change in with `uv lock --upgrade-package <package>` once you have
+pushed it.
 
-> Nur wenn du **Abhängigkeiten** eines Werkzeugs änderst oder die öffentliche API
-> in `__init__.py`, in den betroffenen Projekten einmal `uv sync` / `uv add`
-> wiederholen.
+> Only if you change a tool's **dependencies** or the public API in
+> `__init__.py` do you need to repeat `uv sync` / `uv add` once in the affected
+> projects.
 
 ---
 
-## Neues Werkzeug hinzufügen
+## Adding a new tool
 
-Beispiel `jassimo.bio`:
+Example `jassimo.bio`:
 
 ```bash
 mkdir -p bio/src/jassimo/bio
-# 1. bio/src/jassimo/bio/__init__.py  -> öffentliche API
-# 2. bio/pyproject.toml               -> nach dem Muster von plotting/pyproject.toml
-#    (name = "jassimo-bio", eigene dependencies, include = ["jassimo.bio*"])
-# 3. In der Wurzel-pyproject.toml "bio" zu members hinzufügen.
+# 1. bio/src/jassimo/bio/__init__.py  -> public API
+# 2. bio/pyproject.toml               -> following the pattern of plotting/pyproject.toml
+#    (name = "jassimo-bio", own dependencies, include = ["jassimo.bio*"])
+# 3. Add "bio" to members in the root pyproject.toml.
 uv sync
 ```
 
-**Wichtig:** Es gibt bewusst KEINE Datei `src/jassimo/__init__.py`. Dieses Fehlen
-macht `jassimo` zu einem _Namespace-Package_ (PEP 420) — nur so können mehrere
-getrennt installierbare Pakete denselben `jassimo`-Namespace teilen. Lege diese
-Datei niemals an.
+**Important:** There is deliberately NO file `src/jassimo/__init__.py`. That
+absence makes `jassimo` a _namespace package_ (PEP 420) — it is the only way
+several independently installable packages can share the same `jassimo`
+namespace. Never create this file.
 
 ---
 
-## Warum uv?
+## Why uv?
 
-uv verwaltet Environment und Pakete in einem, ist sehr schnell, und hat mit
-_Workspaces_ ein natives Konzept für genau dieses Multi-Paket-Repo (siehe
-`[tool.uv.workspace]` in der Wurzel-`pyproject.toml`). Das Paketformat selbst ist
-Standard (PEP 621) — dieselben Pakete ließen sich auch mit pip installieren
-(`pip install -e plotting/`), falls du das je brauchst.
+uv manages environment and packages in one, is very fast, and with _workspaces_
+has a native concept for exactly this multi-package repo (see
+`[tool.uv.workspace]` in the root `pyproject.toml`). The package format itself is
+standard (PEP 621) — the same packages could also be installed with pip
+(`pip install -e plotting/`), should you ever need that.
