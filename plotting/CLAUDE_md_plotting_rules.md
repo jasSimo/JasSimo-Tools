@@ -22,6 +22,12 @@
   font-size guarantee does not hold.
 - **Colors** come from `PALETTE` (Okabe–Ito). Project-specific named colors live
   in a thin project layer on top of `PALETTE` — never hardcoded in the plot.
+- **Multi-panel figures via `new_figure(nrows=…, ncols=…)`**, never with a
+  hand-written figsize — that is what adjusts panel titles, body text, canvas
+  height and tick count for a grid. One shared legend via
+  `legend_outside(ax, side="bottom")`.
+- **Grouped boxes/bars use `gap=BOX_GAP`**, so the members of a hue group do not
+  sit flush against each other.
 - **Metadata for you as the developer (run IDs and the like) do NOT belong in the
   title.** The title is publication-ready; distinguishing runs happens via the
   file name.

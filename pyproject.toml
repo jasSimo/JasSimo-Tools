@@ -19,4 +19,4 @@ jassimo-plotting = { workspace = true }
 jassimo-io = { workspace = true }
 
 [dependency-groups]
-dev = ["jassimo-plotting", "jassimo-io"]
+dev = ["jassimo-plotting", "jassimo-io", "pytest>=8", "pillow>=10"]

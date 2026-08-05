@@ -37,6 +37,7 @@ Working on the toolkit itself (all tools at once, editable):
 ```bash
 cd ~/code/JasSimo-Tools
 uv sync            # sets up .venv, installs all members editable
+uv run pytest plotting/tests   # the plotting guarantees, checked on real renders
 ```
 
 ---

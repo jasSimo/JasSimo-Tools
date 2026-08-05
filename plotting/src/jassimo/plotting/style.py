@@ -50,6 +50,7 @@ from pathlib import Path
 from typing import Any, Final
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 import numpy as np
 import seaborn as sns
 from matplotlib.axes import Axes
@@ -72,6 +73,13 @@ class Target:
     formats:  file types savefig() writes, in order. First one is the "primary".
     seaborn_context: seaborn scaling context; we override exact sizes anyway,
               but this keeps line widths / marker sizes sensibly scaled.
+    panel_title: axes-title size in MULTI-PANEL figures. Every other size here is
+              measured for ONE axes filling the canvas; a 2x2 panel is a third of
+              that width and the full-size bold title both overwhelms it and
+              collides with its neighbours. See :func:`new_figure`.
+    max_height: tallest figure this medium tolerates, in inches. Multi-panel
+              figures grow downwards up to this; for slides it equals the canvas
+              height, because the slide itself cannot grow.
     """
 
     name: str
@@ -84,6 +92,8 @@ class Target:
     annot: int          # heatmap cell annotations — may be smaller than body text
     formats: tuple[str, ...]
     seaborn_context: str
+    panel_title: int
+    max_height: float
 
 
 # Google Slides geometry is exact: 10 × 5.625 in @ 96 DPI = 960 × 540 px.
@@ -97,6 +107,7 @@ TARGETS: Final[dict[str, Target]] = {
         title=20, suptitle=22, axis=17, tick=15, legend=15, annot=13,
         formats=("png",),
         seaborn_context="talk",
+        panel_title=17, max_height=4.5,     # the slide cannot grow
     ),
     "paper": Target(
         name="paper",
@@ -104,18 +115,32 @@ TARGETS: Final[dict[str, Target]] = {
         title=15, suptitle=16, axis=13, tick=11, legend=11, annot=9,
         formats=("svg",),
         seaborn_context="paper",
+        # 11 pt, a step below the other targets' panel titles relative to their
+        # body text: a column-width canvas leaves the least room per panel, and
+        # at 13 pt these titles needed two lines.
+        panel_title=11, max_height=9.0,     # one manuscript column
     ),
     "pdf": Target(
         name="pdf",
-        figsize=(8.0, 6.0),
+        # 8 x 5 in, not the 4:3 of a slide deck: at 4:3 this was the squarest of
+        # the three canvases, which stretches bars and panels vertically. 1.6:1
+        # sits between the paper column and the wide slide.
+        figsize=(8.0, 5.0),
         title=17, suptitle=18, axis=15, tick=13, legend=13, annot=10,
         formats=("pdf", "png"),
         seaborn_context="notebook",
+        panel_title=15, max_height=9.5,     # one portrait page
     ),
 }
 
 DEFAULT_TARGET: Final[str] = "slides"
 PLOT_DPI: Final[int] = 300   # for raster outputs (png); vector formats ignore it
+
+# ── Multi-panel tuning (see new_figure) ──────────────────────────────────────
+# Panels are a fraction of the canvas, so body text steps down with them and the
+# number of ticks is capped — full-size ticks in a third-width panel collide.
+PANEL_SCALE: Final[float] = 0.8      # ticks / labels / legend, relative to target
+PANEL_MAX_TICKS: Final[int] = 4      # per numeric axis
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -147,6 +172,13 @@ PALETTE_SECONDARY: Final[str] = PALETTE[1]
 CMAP_SEQUENTIAL: Final[str] = "viridis"   # perceptually uniform, CVD-friendly
 CMAP_DIVERGING: Final[str] = "RdBu_r"     # signed data centred on white
 
+# Gap between the boxes/bars/violins of one hue group, as a fraction of their
+# width. Without it seaborn draws the members of a group flush against each
+# other and they read as one wide shape. seaborn takes this only as a call
+# argument (there is no rcParam), so pass it explicitly:
+#     sns.boxplot(..., hue="genotype", gap=BOX_GAP)
+BOX_GAP: Final[float] = 0.15
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Legend placement — always outside the axes so it never overlaps data
@@ -156,22 +188,40 @@ LEGEND_OUTSIDE_RIGHT: Final[dict[str, Any]] = {
     "bbox_to_anchor": (1.02, 1.0), "loc": "upper left",
     "borderaxespad": 0.0, "frameon": False,
 }
+# Anchored to the FIGURE, not the axes: constrained_layout reserves the strip
+# itself, so the legend clears the tick labels and the x-axis label whatever
+# their height. A fixed axes-fraction offset cannot — it used to be drawn
+# straight over the x-axis label.
 LEGEND_OUTSIDE_BOTTOM: Final[dict[str, Any]] = {
-    "bbox_to_anchor": (0.5, -0.18), "loc": "upper center",
-    "borderaxespad": 0.0, "frameon": False,
+    "loc": "outside lower center", "frameon": False,
 }
 
 
 def legend_outside(ax: Axes, *, side: str = "right", **kwargs: Any) -> None:
     """Place ``ax``'s legend outside the axes area so it never overlaps data.
 
+    ``side="bottom"`` produces a FIGURE-level legend centred under everything —
+    which is also how a multi-panel figure gets one shared legend instead of one
+    per panel. It requires constrained_layout, which :func:`set_style` enables.
+
     Args:
-        ax:   Axes whose legend to place.
-        side: ``"right"`` (default) or ``"bottom"`` (wide multi-panel figures).
-        **kwargs: Forwarded to ``ax.legend`` (e.g. ``handles``, ``ncol``).
+        ax:   Axes whose legend entries to use.
+        side: ``"right"`` (default) or ``"bottom"`` (wide or multi-panel figures).
+        **kwargs: Forwarded to the legend call (e.g. ``handles``, ``labels``,
+            ``ncol``, ``title``).
     """
-    placement = LEGEND_OUTSIDE_RIGHT if side == "right" else LEGEND_OUTSIDE_BOTTOM
-    ax.legend(**{**placement, **kwargs})
+    if side != "bottom":
+        ax.legend(**{**LEGEND_OUTSIDE_RIGHT, **kwargs})
+        return
+
+    handles = kwargs.pop("handles", None)
+    labels = kwargs.pop("labels", None)
+    if handles is None or labels is None:
+        handles, labels = ax.get_legend_handles_labels()
+    existing = ax.get_legend()
+    if existing is not None:
+        existing.remove()      # seaborn may have put one inside the axes already
+    ax.figure.legend(handles, labels, **{**LEGEND_OUTSIDE_BOTTOM, **kwargs})
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -258,16 +308,96 @@ def active_target() -> Target:
     return _active
 
 
-def new_figure(**kwargs: Any) -> tuple[Figure, Axes]:
+# ═══════════════════════════════════════════════════════════════════════════════
+# Panel mode — multi-panel figures need their own sizes, not the single-axes ones
+# ═══════════════════════════════════════════════════════════════════════════════
+# Entered by new_figure() when a grid is requested, left by savefig(). The state
+# is module-level for the same reason set_style()'s is: one figure at a time.
+
+_panel_rc_backup: dict[str, Any] | None = None
+
+
+def _panel_figsize(t: Target, nrows: int, ncols: int) -> tuple[float, float]:
+    """Canvas for a grid: medium-fixed width, height scaled by rows-per-column.
+
+    Scaling by rows ALONE stretches the figure: a second column already gives
+    each panel its width back, so growing the height on top leaves tall, narrow
+    panels (a 2x2 pdf came out 8 x 9.5 in, taller than it is wide). Rows over
+    columns keeps every panel at roughly the proportions of the single-axes
+    canvas. Never below the base height — a single row of panels stays as tall as
+    a normal figure — and never above what the medium takes.
+    """
+    width, height = t.figsize
+    scaled = height * (nrows / ncols)
+    return (width, min(max(scaled, height), t.max_height))
+
+
+def _enter_panel_mode(t: Target) -> None:
+    global _panel_rc_backup
+    keys = ("axes.titlesize", "axes.titleweight", "axes.titlelocation",
+            "axes.titlepad", "axes.labelsize", "xtick.labelsize",
+            "ytick.labelsize", "legend.fontsize", "legend.title_fontsize")
+    if _panel_rc_backup is None:          # never overwrite the single-axes values
+        _panel_rc_backup = {k: plt.rcParams[k] for k in keys}
+    plt.rcParams.update({
+        # Bold and centred like a single-axes title, only stepped down in size:
+        # a panel title labels its panel without competing with the suptitle.
+        # Set it per axes with set_title(loc="left") if a particular figure wants
+        # the flush-left panel convention instead.
+        "axes.titlesize": t.panel_title,
+        "axes.titleweight": "bold",
+        "axes.titlelocation": "center",
+        "axes.titlepad": 6.0,
+        "axes.labelsize": round(t.axis * PANEL_SCALE),
+        "xtick.labelsize": round(t.tick * PANEL_SCALE),
+        "ytick.labelsize": round(t.tick * PANEL_SCALE),
+        "legend.fontsize": round(t.legend * PANEL_SCALE),
+        "legend.title_fontsize": round(t.legend * PANEL_SCALE) + 1,
+    })
+
+
+def _exit_panel_mode() -> None:
+    global _panel_rc_backup
+    if _panel_rc_backup is not None:
+        plt.rcParams.update(_panel_rc_backup)
+        _panel_rc_backup = None
+
+
+def _thin_panel_ticks(fig: Figure) -> None:
+    """Cap the tick count on plain numeric axes of a panel figure.
+
+    Only axes still carrying matplotlib's default ``AutoLocator`` are touched —
+    categorical axes (bar/box plots) and log axes bring their own locator, and
+    replacing it would destroy their labels.
+    """
+    for ax in fig.axes:
+        for axis in (ax.xaxis, ax.yaxis):
+            if type(axis.get_major_locator()) is mticker.AutoLocator:
+                axis.set_major_locator(mticker.MaxNLocator(PANEL_MAX_TICKS))
+
+
+def new_figure(**kwargs: Any) -> tuple[Figure, Any]:
     """``plt.subplots`` pre-sized to the active target's ``figsize``.
 
-    Any keyword (e.g. ``ncols=2``) is forwarded to ``plt.subplots``; an explicit
-    ``figsize`` overrides the target default when you truly need a custom size.
+    Any keyword is forwarded to ``plt.subplots``; an explicit ``figsize``
+    overrides the target default when you truly need a custom size.
+
+    Asking for a grid (``nrows``/``ncols`` beyond 1) switches on PANEL MODE: the
+    canvas grows downwards as far as the medium allows, axes titles step down to
+    ``Target.panel_title``, and body text scales by
+    :data:`PANEL_SCALE`, because every size in :class:`Target` is measured for one
+    axes filling the canvas. :func:`savefig` restores the single-axes values.
 
     Returns:
-        ``(fig, ax)`` exactly as ``plt.subplots`` does.
+        ``(fig, ax)`` exactly as ``plt.subplots`` does — ``ax`` is an array for a
+        grid.
     """
-    kwargs.setdefault("figsize", _active.figsize)
+    nrows, ncols = int(kwargs.get("nrows", 1)), int(kwargs.get("ncols", 1))
+    if nrows * ncols > 1:
+        kwargs.setdefault("figsize", _panel_figsize(_active, nrows, ncols))
+        _enter_panel_mode(_active)
+    else:
+        kwargs.setdefault("figsize", _active.figsize)
     return plt.subplots(**kwargs)
 
 
@@ -275,27 +405,90 @@ def new_figure(**kwargs: Any) -> tuple[Figure, Axes]:
 # Saving — one call writes every format the target declares
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _wrap_text(text: str, max_chars: int) -> str:
-    return textwrap.fill(text, width=max_chars) if len(text) > max_chars else text
+_WRAP_PASSES: Final[int] = 3        # wrapping reflows the layout; re-measure
+_WRAP_MARGIN_IN: Final[float] = 0.05
+_WRAP_MIN_CHARS: Final[int] = 12
+
+
+def _axes_titles(ax: Axes) -> list[Any]:
+    """All title artists of ``ax`` that carry text.
+
+    ``ax.title`` is only the CENTRED one; ``set_title(loc="left")`` — which panel
+    mode uses — writes to a separate artist, and a title looked up the wrong way
+    would silently never be wrapped.
+    """
+    candidates = (ax.title,
+                  getattr(ax, "_left_title", None),
+                  getattr(ax, "_right_title", None))
+    return [t for t in candidates if t is not None and t.get_text().strip()]
+
+
+def _title_budget_in(ax: Axes, title: Any, fig_width_in: float) -> float:
+    """Width a title on ``ax`` may occupy without leaving the canvas, in inches.
+
+    The axes width is the natural budget, but a title is anchored to the axes,
+    and an axes pushed aside by an outside legend sits off-centre — so a title
+    that fits the axes can still overhang the figure edge. Take whichever of the
+    two is tighter, measured from the title's own anchor point.
+    """
+    pos = ax.get_position()
+    align = title.get_horizontalalignment()
+    if align == "left":
+        reach = fig_width_in - pos.x0 * fig_width_in
+    elif align == "right":
+        reach = pos.x1 * fig_width_in
+    else:
+        centre = (pos.x0 + pos.x1) / 2.0 * fig_width_in
+        reach = 2.0 * min(centre, fig_width_in - centre)
+    return max(0.5, min(pos.width * fig_width_in, reach) - _WRAP_MARGIN_IN)
+
+
+def _rewrap(text: Any, budget_in: float, dpi: float) -> bool:
+    """Re-wrap one text to ``budget_in``. Returns True if it changed.
+
+    The line width comes from MEASURING the text in its actual font rather than
+    from a characters-per-inch constant: the real value ranges from 5.0 (20 pt
+    bold, slides) to 6.7 (15 pt bold, paper), so any single constant is wrong by
+    up to 50 % somewhere.
+    """
+    original = text.get_text()
+    if not original.strip():
+        return False
+    flat = " ".join(original.split())
+    text.set_text(flat)
+    width_in = text.get_window_extent().width / dpi
+    if width_in <= budget_in:
+        text.set_text(original)     # fits — keep any manual line breaks as-is
+        return False
+    chars_per_in = len(flat) / width_in
+    max_chars = max(_WRAP_MIN_CHARS, int(budget_in * chars_per_in))
+    wrapped = textwrap.fill(flat, width=max_chars)
+    text.set_text(wrapped)
+    return wrapped != original
 
 
 def _wrap_all_text(fig: Figure) -> None:
     """Line-wrap axes titles and figure-level texts that would clip the canvas.
 
-    Titles are wrapped to the *axes* width (a centred title is anchored to the
-    axes, which may be narrower than the figure after leaving room for a legend);
-    figure-level texts use the full figure width.
+    Draws the figure first: constrained_layout only settles the axes positions
+    at draw time, so measuring before that reads matplotlib's placeholder
+    geometry (0.775 of the figure width) instead of the real one. Wrapping then
+    reflows the layout again, hence the repeat until nothing changes.
     """
-    width_in = float(fig.get_size_inches()[0])
-    fig_max = max(30, round(width_in * 7.5))
-    for ax in fig.axes:
-        t = ax.get_title()
-        if t:
-            ax_width_in = ax.get_position().width * width_in
-            ax.title.set_text(_wrap_text(t, max(20, round(ax_width_in * 7.5))))
-    for txt in fig.texts:
-        if txt.get_text():
-            txt.set_text(_wrap_text(txt.get_text(), fig_max))
+    fig_width_in = float(fig.get_size_inches()[0])
+    fig_budget = fig_width_in - 2 * _WRAP_MARGIN_IN
+    for _ in range(_WRAP_PASSES):
+        fig.draw_without_rendering()
+        changed = False
+        for ax in fig.axes:
+            for title in _axes_titles(ax):
+                changed |= _rewrap(title,
+                                   _title_budget_in(ax, title, fig_width_in),
+                                   fig.dpi)
+        for txt in fig.texts:
+            changed |= _rewrap(txt, fig_budget, fig.dpi)
+        if not changed:
+            return
 
 
 def savefig(
@@ -308,10 +501,14 @@ def savefig(
 ) -> list[Path]:
     """Save ``fig`` into ``out_dir`` as every format the active target declares.
 
-    Wraps over-long titles first (so text never clips) and writes at the figure's
-    declared ``figsize`` — no tight bbox — so all figures in a family share pixel
-    dimensions for side-by-side placement. Vector formats (svg/pdf) keep text as
-    real, scalable text; png is written at :data:`PLOT_DPI`.
+    Thins panel ticks and wraps over-long titles first (so text never clips) and
+    writes at the figure's declared ``figsize`` — no tight bbox — so all figures
+    in a family share pixel dimensions for side-by-side placement. Vector formats
+    (svg/pdf) keep text as real, scalable text; png is written at
+    :data:`PLOT_DPI`.
+
+    Also ends panel mode if :func:`new_figure` started one, restoring the
+    single-axes font sizes for the next figure.
 
     Args:
         fig:     The figure to save.
@@ -324,14 +521,19 @@ def savefig(
     """
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    _wrap_all_text(fig)
-    fmts = formats if formats is not None else _active.formats
-    paths: list[Path] = []
-    for fmt in fmts:
-        p = out / f"{name}.{fmt}"
-        fig.savefig(p, dpi=PLOT_DPI, format=fmt)
-        logger.info("Saved %s", p)
-        paths.append(p)
+    try:
+        if _panel_rc_backup is not None:
+            _thin_panel_ticks(fig)
+        _wrap_all_text(fig)
+        fmts = formats if formats is not None else _active.formats
+        paths: list[Path] = []
+        for fmt in fmts:
+            p = out / f"{name}.{fmt}"
+            fig.savefig(p, dpi=PLOT_DPI, format=fmt)
+            logger.info("Saved %s", p)
+            paths.append(p)
+    finally:
+        _exit_panel_mode()
     if close:
         plt.close(fig)
     return paths

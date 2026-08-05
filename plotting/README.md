@@ -62,11 +62,13 @@ for target in ("slides", "paper"):
 
 ## The three targets
 
-| Target   | Geometry    | Title | Ticks | Output    | For what                                                  |
-| -------- | ----------- | ----- | ----- | --------- | --------------------------------------------------------- |
-| `slides` | 10 × 4.5 in | 20 pt | 15 pt | PNG       | Google Slides 16:9, insert at **100 %** (do not drag)     |
-| `paper`  | 6 × 4 in    | 15 pt | 11 pt | SVG       | LaTeX/manuscript column (vector, crisp, searchable)       |
-| `pdf`    | 8 × 6 in    | 17 pt | 13 pt | PDF + PNG | Standalone full-page figure                                |
+| Target   | Geometry    | Title | Ticks | Panel title | Max height | Output    | For what                                              |
+| -------- | ----------- | ----- | ----- | ----------- | ---------- | --------- | ----------------------------------------------------- |
+| `slides` | 10 × 4.5 in | 20 pt | 15 pt | 17 pt       | 4.5 in     | PNG       | Google Slides 16:9, insert at **100 %** (do not drag) |
+| `paper`  | 6 × 4 in    | 15 pt | 11 pt | 11 pt       | 9 in       | SVG       | LaTeX/manuscript column (vector, crisp, searchable)   |
+| `pdf`    | 8 × 5 in    | 17 pt | 13 pt | 15 pt       | 9.5 in     | PDF + PNG | Standalone full-page figure                            |
+
+The last two columns only apply to multi-panel figures, see below.
 
 **Why insert `slides` at 100 %?** The slide is internally 960 × 540 px (10 ×
 5.625 in @ 96 DPI). At 100 %, 1 matplotlib-pt = 1 slide-pt, so your 20 pt title
@@ -80,6 +82,30 @@ get blurry when zooming in; hence SVG for the paper.
 
 ---
 
+## Multi-panel figures
+
+Every size in the table above is measured for **one** axes filling the canvas.
+Ask `new_figure` for a grid and it switches to panel mode by itself:
+
+```python
+fig, axes = new_figure(nrows=2, ncols=2)     # panel mode, automatically
+...
+legend_outside(axes[1, 1], side="bottom", ncol=3)   # one shared legend
+savefig(fig, out_dir, "dashboard")           # restores the single-axes sizes
+```
+
+What changes: the canvas height scales with **rows per column**, so every panel
+keeps roughly the proportions of the single-axes canvas — a 2×2 stays as tall as
+a normal figure, two stacked panels get twice the height, capped at `max_height`
+and never below the base height (`slides` never grows at all, a slide cannot).
+Axes titles drop to the panel size, still bold and centred over their panel; body
+text scales by `PANEL_SCALE`; numeric axes are capped at `PANEL_MAX_TICKS` ticks,
+while categorical and log axes keep their own. For the flush-left panel
+convention, set it per axes with `ax.set_title("A  Feature space", loc="left")`.
+
+Do not set `figsize` by hand for this. `savefig` ends panel mode, so the next
+figure is a normal single-axes one again.
+
 ## What is guaranteed
 
 - **Font on slides always presentation-sized** — independent of the number of
@@ -90,8 +116,20 @@ get blurry when zooming in; hence SVG for the paper.
 - **Nothing gets clipped** (`constrained_layout`), while at the same time all
   figures of a family have **identical pixel dimensions** (no
   `bbox_inches="tight"`).
-- **Long titles** wrap automatically instead of running over the edge.
-- **Legends** sit outside the axes and never overlap data.
+- **Long titles** wrap automatically instead of running over the edge — measured
+  in the actual title font, after the layout has settled.
+- **Legends** sit outside the axes and never overlap data. `side="bottom"` puts
+  one legend under the whole figure, clear of the axis label.
+- **Grouped boxes/bars** are separated by `BOX_GAP` instead of sitting flush
+  against each other: `sns.boxplot(..., hue=..., gap=BOX_GAP)`.
+
+These are not claims but tests — `plotting/tests/` renders figures and measures
+the result (border pixels for clipping, text bounding boxes for overlap, point
+sizes for the font guarantee):
+
+```bash
+uv run pytest plotting/tests
+```
 
 ---
 

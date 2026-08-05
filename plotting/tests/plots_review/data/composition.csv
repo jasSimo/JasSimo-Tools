@@ -1,0 +1,5 @@
+condition,ordered,partial,disordered
+control,81.6,8.4,10.0
+low_dose,55.4,36.6,8.0
+high_dose,54.6,18.3,27.0
+washout,66.9,24.7,8.4

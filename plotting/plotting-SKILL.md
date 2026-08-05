@@ -65,28 +65,40 @@ plot code.
    Not the same statement in the title, legend and bar label at once.
 
 6. **Legend outside the axes** via `legend_outside(ax)` (right) or
-   `legend_outside(ax, side="bottom")` (wide multi-panel figures). Every color,
-   every marker, every line style in the plot has a concise legend entry
-   (≤ 4 words).
+   `legend_outside(ax, side="bottom")` — the latter is a figure-level legend and
+   is how a multi-panel figure gets ONE shared legend instead of one per panel.
+   Every color, every marker, every line style in the plot has a concise legend
+   entry (≤ 4 words).
 
 7. **Symmetric heatmaps** (M[i,j] == M[j,i]) only as a lower triangular matrix:
    `sns.heatmap(data, mask=mask_upper_triangle(data), ...)`.
 
-8. **All visible texts in English** — titles, axes, ticks, legends, annotations.
+8. **Grouped boxes/bars/violins always with `gap=BOX_GAP`**. Without it seaborn
+   draws the members of a hue group flush against each other and they read as
+   one wide shape.
+
+9. **Multi-panel via `new_figure(nrows=…, ncols=…)`**, never with a hand-written
+   `figsize`. That switches on panel mode: canvas height, panel title size, body
+   text and tick count are adjusted for the grid, because the target sizes are
+   measured for a single axes. `savefig` switches it off again.
+
+10. **All visible texts in English** — titles, axes, ticks, legends, annotations.
 
 ## What the package handles automatically
 
 - Colorblind-safe default color cycle.
 - `constrained_layout`: nothing gets clipped, with identical pixel dimensions
   across all figures of a family.
-- Automatic line wrapping of over-long titles.
+- Automatic line wrapping of over-long titles, measured in the real title font.
+- Panel mode for grids: sizes, canvas height and tick count.
 - Saving in all formats of the target with a single `savefig` call.
 
 ## Common mistakes to avoid
 
 - Forgetting `set_style()` → default target `slides`, but better to set it
   explicitly.
-- `plt.subplots()` instead of `new_figure()` → wrong geometry, font too small.
+- `plt.subplots()` instead of `new_figure()` → wrong geometry, font too small,
+  and for a grid no panel mode.
 - `plt.savefig()` instead of `savefig()` → wrong format, clipping, wrong DPI.
 - Shrinking a slide plot in Slides with the mouse → font-size guarantee violated.
 - Writing the same plot twice for paper and slides instead of rendering it twice.
