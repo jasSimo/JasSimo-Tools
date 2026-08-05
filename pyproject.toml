@@ -20,3 +20,9 @@ jassimo-io = { workspace = true }
 
 [dependency-groups]
 dev = ["jassimo-plotting", "jassimo-io", "pytest>=8", "pillow>=10"]
+
+# Bare `uv run pytest` collects from tests/ only, instead of walking the whole
+# repo. The tests render figures and measure the result, so they need the
+# packages installed — `uv sync` does that (see the dev group above).
+[tool.pytest.ini_options]
+testpaths = ["tests"]

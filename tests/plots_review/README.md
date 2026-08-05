@@ -44,7 +44,7 @@ targets were inspected as well.
 
 Three defects surfaced here and have since been repaired in
 `plotting/src/jassimo/plotting/style.py`; each one now has a regression test in
-`plotting/tests/`.
+`tests/test_render_guarantees.py`.
 
 **1. `legend_outside(ax, side="bottom")` drew over the x-axis label.** It
 anchored at a fixed `(0.5, -0.18)` in axes fractions, which reserves no room for

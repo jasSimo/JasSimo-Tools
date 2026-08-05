@@ -122,13 +122,16 @@ figure is a normal single-axes one again.
   one legend under the whole figure, clear of the axis label.
 - **Grouped boxes/bars** are separated by `BOX_GAP` instead of sitting flush
   against each other: `sns.boxplot(..., hue=..., gap=BOX_GAP)`.
+- **Byte-reproducible output**: re-rendering an unchanged figure gives an
+  identical file in every format, so version control stays quiet. Vector backends
+  would otherwise stamp each file with a creation time and a per-session id salt.
 
-These are not claims but tests — `plotting/tests/` renders figures and measures
+These are not claims but tests — `tests/` in the repo root renders figures and measures
 the result (border pixels for clipping, text bounding boxes for overlap, point
 sizes for the font guarantee):
 
 ```bash
-uv run pytest plotting/tests
+uv run pytest tests
 ```
 
 ---

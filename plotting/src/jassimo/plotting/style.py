@@ -299,6 +299,11 @@ def set_style(target: str = DEFAULT_TARGET) -> Target:
         "axes.spines.top": False,
         "axes.spines.right": False,
         "axes.prop_cycle": plt.cycler(color=PALETTE),
+        # Fixed salt for the ids matplotlib generates inside an SVG (clip paths,
+        # glyph defs). Left at None it draws a fresh uuid4 per session, so the
+        # same figure produces a different file every run. Together with the
+        # stripped timestamps in savefig() this makes all outputs byte-stable.
+        "svg.hashsalt": "jassimo.plotting",
     })
     return t
 
@@ -491,6 +496,17 @@ def _wrap_all_text(fig: Figure) -> None:
             return
 
 
+# Vector backends stamp every file with the time it was written, so two renders
+# of an unchanged figure differ byte for byte and show up as modified in version
+# control forever. Dropping the timestamp makes the outputs reproducible. The key
+# is backend-specific — SVG takes Dublin Core "Date", PDF takes "CreationDate" —
+# and passing the wrong one raises, hence the per-format table.
+_REPRODUCIBLE_METADATA: Final[dict[str, dict[str, None]]] = {
+    "svg": {"Date": None},
+    "pdf": {"CreationDate": None},
+}
+
+
 def savefig(
     fig: Figure,
     out_dir: Path | str,
@@ -529,7 +545,8 @@ def savefig(
         paths: list[Path] = []
         for fmt in fmts:
             p = out / f"{name}.{fmt}"
-            fig.savefig(p, dpi=PLOT_DPI, format=fmt)
+            fig.savefig(p, dpi=PLOT_DPI, format=fmt,
+                        metadata=_REPRODUCIBLE_METADATA.get(fmt))
             logger.info("Saved %s", p)
             paths.append(p)
     finally:

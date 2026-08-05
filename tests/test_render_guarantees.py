@@ -5,10 +5,12 @@ overlapping — is a property of the RENDERED figure, invisible in the source. S
 each test renders and then measures: ink in the border pixels means clipping,
 intersecting text bounding boxes mean overlap.
 
-    pytest plotting/tests
+    pytest tests
 """
 
 from __future__ import annotations
+
+import hashlib
 
 import matplotlib
 
@@ -163,6 +165,22 @@ def test_long_title_wraps_inside_the_canvas(target):
     assert box.x0 >= -1 and box.x1 <= fig.get_window_extent().x1 + 1, (
         f"{target}: title spills over the canvas edge")
     assert "\n" in ax.title.get_text(), "a 111-char title should have wrapped"
+
+
+@pytest.mark.parametrize("target", TARGET_NAMES)
+def test_output_is_byte_reproducible(target, tmp_path):
+    """The same figure rendered twice must give identical files.
+
+    Vector backends stamp a creation date and salt their internal ids with a
+    per-session uuid, which turns every re-render into a version-control diff.
+    """
+    digests = []
+    for run in ("first", "second"):
+        set_style(target)
+        fig, _ = _simple_figure()
+        paths = savefig(fig, tmp_path / run, "repro")
+        digests.append([hashlib.sha256(p.read_bytes()).hexdigest() for p in paths])
+    assert digests[0] == digests[1], f"{target}: output differs between runs"
 
 
 def test_left_aligned_title_is_wrapped_too():
