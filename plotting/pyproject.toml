@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jassimo-plotting"
+version = "0.1.0"
+description = "Colorblind-safe matplotlib/seaborn style with slide/paper/pdf render targets."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "numpy>=1.26",
+]
+
+# Namespace package: only the jassimo.plotting subpackage lives here, NOT a
+# jassimo/__init__.py. That absence is deliberate — it lets jassimo.io (a separate
+# package) share the same "jassimo" import namespace.
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["jassimo.plotting*"]
+namespaces = true

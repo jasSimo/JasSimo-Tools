@@ -1,0 +1,22 @@
+[project]
+name = "jassimo-tools"
+version = "0.1.0"
+authors = [
+  {name = "Jasmin Simon"}
+]
+description = "Personal use only toolkit — one repo, several independently installable tools under the shared 'jassimo' namespace."
+requires-python = ">=3.11"
+
+# The root itself ships no code; it only ties the member packages together.
+[tool.uv.workspace]
+members = ["plotting", "io"]
+
+# Convenience: developing here pulls in every member editable at once, so the
+# whole toolkit is available while you work on it. Individual PROJECTS instead
+# install only the tools they need (see README).
+[tool.uv.sources]
+jassimo-plotting = { workspace = true }
+jassimo-io = { workspace = true }
+
+[dependency-groups]
+dev = ["jassimo-plotting", "jassimo-io"]
